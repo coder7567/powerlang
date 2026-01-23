@@ -11,6 +11,7 @@ class TokenType(Enum):
     
     # Identifiers and literals
     IDENTIFIER = auto()
+    VARIABLE = auto() 
     STRING = auto()
     INTEGER = auto()
     DOUBLE = auto()
