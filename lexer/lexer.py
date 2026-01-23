@@ -140,23 +140,23 @@ class Lexer:
     
     def _scan_variable(self) -> Token:
         """Scan a variable starting with $"""
-        # Skip $
-        self.scanner.advance()
-        
-        # Check for special variable forms
-        if self.scanner.current_char == '{':
-            # ${variable} form
-            self.scanner.advance()
+        # We are at $
+        self.scanner.advance()  # consume $
+
+        if not self.scanner.is_identifier_start():
+            self._error("Invalid variable name")
             lexeme = self.scanner.get_lexeme()
-            return self._create_token(TokenType.DOLLAR_LBRACE, lexeme, None)
-        
-        # Regular variable: $name or $name123
-        while (not self.scanner.is_at_end and 
-               self.scanner.is_letter_or_digit()):
+            return self._create_token(TokenType.VARIABLE, lexeme, None)
+
+        # Scan identifier part
+        while self.scanner.is_identifier_part():
             self.scanner.advance()
-        
-        lexeme = self.scanner.get_lexeme()
-        return self._create_token(TokenType.DOLLAR, lexeme, lexeme)
+
+        lexeme = self.scanner.get_lexeme()      # "$x"
+        name = lexeme[1:].lower()               # "x"
+
+        return self._create_token(TokenType.VARIABLE, lexeme, name)
+
     
     def _scan_string(self) -> Token:
         """Scan a string literal"""
@@ -413,7 +413,7 @@ class Lexer:
             return self._create_token(token_type, lexeme, None)
         
         # Regular identifier
-        return self._create_token(TokenType.IDENTIFIER, lexeme, lexeme)
+        return self._create_token(TokenType.IDENTIFIER, lexeme, None)
     
     def _scan_operator(self) -> Token:
         """Scan an operator"""
@@ -442,7 +442,7 @@ class Lexer:
         self.scanner.advance()
         lexeme = self.scanner.get_lexeme()
         self._error(f"Unexpected character: {char}")
-        return self._create_token(TokenType.IDENTIFIER, lexeme, lexeme)
+        return self._create_token(TokenType.IDENTIFIER, lexeme, None)
     
     def _scan_single_char_token(self) -> Token:
         """Scan a single character token"""
