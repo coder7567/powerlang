@@ -38,10 +38,10 @@ class Lexer:
         self.errors.clear()
         
         while not self.scanner.is_at_end:
-            self.scanner.start_lexeme()
             token = self._scan_token()
             if token is not None:
                 self.tokens.append(token)
+
         
         # Add EOF token
         self.tokens.append(Token(
@@ -62,6 +62,8 @@ class Lexer:
         if self.scanner.is_at_end:
             return None
         
+        self.scanner.start_lexeme()
+
         # Handle different token types based on first character
         char = self.scanner.current_char
         
@@ -71,12 +73,6 @@ class Lexer:
             return self._scan_string()
         elif char == '`':
             return self._scan_escape_string()
-        elif char == '#' and self.scanner.peek() == '#':
-            return self._scan_comment()
-        elif char == '<' and self.scanner.peek() == '#':
-            return self._scan_block_comment_start()
-        elif char == '#':
-            return self._scan_single_line_comment()
         elif char.isdigit():
             return self._scan_number()
         elif self._is_identifier_start(char):
@@ -101,16 +97,30 @@ class Lexer:
     def _skip_whitespace_and_comments(self) -> None:
         """Skip whitespace and comments"""
         while not self.scanner.is_at_end:
-            if self.scanner.is_whitespace():
+            if self.scanner.current_char == '\n':
                 self.scanner.advance()
+            elif self.scanner.is_whitespace():
+                self.scanner.advance()
+
             elif self.scanner.current_char == '#' and self.scanner.peek() == '#':
                 # Single line comment: ## comment
                 self.scanner.advance()  # Skip #
                 self.scanner.advance()  # Skip #
                 self.scanner.skip_line_comment()
             elif self.scanner.current_char == '<' and self.scanner.peek() == '#':
-                # Start of block comment, handled in _scan_token
-                break
+                # consume block comment entirely
+                self.scanner.advance()
+                self.scanner.advance()
+                self.scanner.enter_block_comment()
+
+                while not self.scanner.is_at_end:
+                    if self.scanner.current_char == '#' and self.scanner.peek() == '>':
+                        self.scanner.advance()
+                        self.scanner.advance()
+                        self.scanner.exit_block_comment()
+                        break
+                    self.scanner.advance()
+
             elif self.scanner.is_in_comment() or self.scanner.is_in_block_comment():
                 # We're already in a comment, skip appropriately
                 if self.scanner.is_in_comment():
