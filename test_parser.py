@@ -1,9 +1,10 @@
 from powerlang.lexer.lexer import Lexer
 from powerlang.parser.parser import Parser
 
+
 source = """
-function Add-Numbers([int]$a, [int]$b) {
-    return $a + $b
+function AddNumbers([int]$a, [int]$b) {
+    return $a + $b;
 }
 """
 
