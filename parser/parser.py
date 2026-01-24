@@ -138,29 +138,29 @@ class Parser:
             return None
         
         # Check for statement-starting tokens
-        if self._match(TokenType.IF):
+        if self._check(TokenType.IF):
             return self._parse_if_statement()
-        elif self._match(TokenType.FOR):
+        elif self._check(TokenType.FOR):
             return self._parse_for_statement()
-        elif self._match(TokenType.WHILE):
+        elif self._check(TokenType.WHILE):
             return self._parse_while_statement()
-        elif self._match(TokenType.DO):
+        elif self._check(TokenType.DO):
             return self._parse_do_while_statement()
-        elif self._match(TokenType.FOREACH):
+        elif self._check(TokenType.FOREACH):
             return self._parse_foreach_statement()
-        elif self._match(TokenType.SWITCH):
+        elif self._check(TokenType.SWITCH):
             return self._parse_switch_statement()
-        elif self._match(TokenType.RETURN):
+        elif self._check(TokenType.RETURN):
             return self._parse_return_statement()
-        elif self._match(TokenType.BREAK):
+        elif self._check(TokenType.BREAK):
             return self._parse_break_statement()
-        elif self._match(TokenType.CONTINUE):
+        elif self._check(TokenType.CONTINUE):
             return self._parse_continue_statement()
-        elif self._match(TokenType.TRY):
+        elif self._check(TokenType.TRY):
             return self._parse_try_catch_statement()
-        elif self._match(TokenType.THROW):
+        elif self._check(TokenType.THROW):
             return self._parse_throw_statement()
-        elif self._match(TokenType.LBRACE):
+        elif self._check(TokenType.LBRACE):
             return self._parse_block()
         elif self._check(TokenType.DOLLAR):
             return self._parse_variable_declaration()
@@ -718,10 +718,14 @@ class Parser:
             type_annotation = self._parse_type_annotation()
         
         # Check for ref/out modifiers
-        is_ref = self._match(TokenType.REF)
-        is_out = self._match(TokenType.OUT)
+        # is_ref = self._match(TokenType.REF) # Currently not implemented
+        # is_out = self._match(TokenType.OUT) # Currently not implemented
         
-        name_token = self._consume(TokenType.IDENTIFIER, "Expected parameter name")
+        name = self._consume(
+            TokenType.VARIABLE,
+            "Expected parameter name"
+        )
+
         
         # Parse default value if present
         default_value = None
@@ -729,10 +733,10 @@ class Parser:
             default_value = self._parse_expression()
         
         return Parameter(
-            name_token=name_token,
+            name_token=name,
             type_annotation=type_annotation,
             default_value=default_value,
-            is_ref=is_ref or is_out,
+            # is_ref=is_ref or is_out, # Currently not implemented
             line=start_token.line,
             column=start_token.column
         )
@@ -763,9 +767,9 @@ class Parser:
         """Parse a prefix expression"""
         if token.type == TokenType.IDENTIFIER:
             return self._parse_identifier(token)
-        elif token.type == TokenType.DOLLAR:
-            return self._parse_variable_expression(token)
-        elif token.type in (TokenType.INTEGER, TokenType.DOUBLE, 
+        elif token.type == TokenType.VARIABLE:
+            return Variable(token, token.line, token.column)
+        elif token.type in (TokenType.INTEGER, TokenType.FLOAT, 
                            TokenType.STRING, TokenType.BOOL, TokenType.NULL):
             return self._parse_literal(token)
         elif token.type == TokenType.LPAREN:
@@ -817,7 +821,7 @@ class Parser:
         # Regular identifier
         return Variable(token, token.line, token.column)
     
-    def _parse_variable_expression(self, token: Token) -> Expression:
+    # def _parse_variable_expression(self, token: Token) -> Expression: # Not used
         """Parse a variable expression starting with $"""
         # The $ was already consumed, need the identifier
         if self._check(TokenType.IDENTIFIER):
@@ -881,7 +885,17 @@ class Parser:
         start_token = self._peek()
         
         # Parse type name
-        type_token = self._consume(TokenType.IDENTIFIER, "Expected type name")
+        if not self._check(
+            TokenType.IDENTIFIER,
+            TokenType.INT_TYPE,
+            TokenType.FLOAT_TYPE,
+            TokenType.STRING_TYPE,
+            TokenType.BOOL_TYPE
+        ):
+            self._error("Expected type name in type expression")
+        
+        # Consume the type token
+        type_token = self._advance()
         
         # Check for nullable ?
         is_nullable = self._match(TokenType.QUESTION)
@@ -1207,7 +1221,7 @@ class Parser:
         
         token_type = self._peek().type
         return (token_type in (TokenType.IDENTIFIER, TokenType.DOLLAR,
-                               TokenType.INTEGER, TokenType.DOUBLE,
+                               TokenType.INTEGER, TokenType.FLOAT,
                                TokenType.STRING, TokenType.BOOL, TokenType.NULL,
                                TokenType.LPAREN, TokenType.LBRACKET,
                                TokenType.AT, TokenType.LBRACE,
@@ -1225,18 +1239,20 @@ class Parser:
         
         return Precedence.NONE
     
-    def _match(self, token_type: TokenType) -> bool:
-        """Check if current token matches given type, consume if true"""
-        if self._check(token_type):
+    def _match(self, *token_types: TokenType) -> bool:
+        """Check if current token matches any given type, consume if true"""
+        if self._check(*token_types):
             self._advance()
             return True
         return False
+
     
-    def _check(self, token_type: TokenType) -> bool:
-        """Check if current token matches given type"""
+    def _check(self, *token_types: TokenType) -> bool:
+        """Check if current token matches any of the given types"""
         if self._is_at_end():
             return False
-        return self._peek().type == token_type
+        return self._peek().type in token_types
+
     
     def _advance(self) -> Token:
         """Advance to next token and return the previous one"""
