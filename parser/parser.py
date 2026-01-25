@@ -768,7 +768,7 @@ class Parser:
         if token.type == TokenType.IDENTIFIER:
             return self._parse_identifier(token)
         elif token.type == TokenType.VARIABLE:
-            return Variable(token, token.line, token.column)
+            return Variable(name_token=token, line=token.line, column=token.column)
         elif token.type in (TokenType.INTEGER, TokenType.FLOAT, 
                            TokenType.STRING, TokenType.BOOL, TokenType.NULL):
             return self._parse_literal(token)
@@ -789,7 +789,7 @@ class Parser:
         else:
             self._error(f"Unexpected token: {token.lexeme}")
             # Create a dummy expression to continue parsing
-            return Literal(token, None, token.line, token.column)
+            return Literal(token=token, value=None, line=token.line, column=token.column)
     
     def _parse_infix(self, left: Expression, token: Token) -> Expression:
         """Parse an infix expression"""
@@ -816,7 +816,7 @@ class Parser:
         # Check if it's actually a type in type context
         if self.in_type_context and token.type == TokenType.IDENTIFIER:
             # Might be a user-defined type
-            return TypeExpression(token, False, False, 1, token.line, token.column)
+            return TypeExpression(type_token=token, is_nullable=False, is_array=False, array_rank=1, line=token.line, column=token.column)
         
         # Regular identifier
         return Variable(token, token.line, token.column)
@@ -826,7 +826,7 @@ class Parser:
         # The $ was already consumed, need the identifier
         if self._check(TokenType.IDENTIFIER):
             name_token = self._consume(TokenType.IDENTIFIER, "Expected variable name after '$'")
-            return Variable(name_token, token.line, token.column)
+            return Variable(name_token=name_token, line=token.line, column=token.column)
         elif self._check(TokenType.LBRACE):
             # ${expression} interpolation
             self._advance()  # Skip {
@@ -837,11 +837,11 @@ class Parser:
             return expr
         else:
             self._error("Expected variable name or '{' after '$'")
-            return Variable(token, token.line, token.column)
+            return Variable(name_token=token, line=token.line, column=token.column)
     
     def _parse_literal(self, token: Token) -> Literal:
         """Parse a literal expression"""
-        return Literal(token, token.literal, token.line, token.column)
+        return Literal(token=token, value=token.literal, line=token.line, column=token.column)
     
     def _parse_grouping(self) -> Expression:
         """Parse a parenthesized expression"""
