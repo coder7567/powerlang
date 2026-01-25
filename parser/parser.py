@@ -47,7 +47,7 @@ class Parser:
         except ParseError as e:
             self.error_handler.error(e)
             # Return empty program on error
-            return Program([], [], [], [], 1, 1)
+            return Program(statements=[], namespaces=[], classes=[], functions=[], line=1, column=1)
     
     # ============================================================================
     # Program-level parsing
@@ -86,9 +86,14 @@ class Parser:
                 self.error_handler.error(e)
                 self._synchronize()
         
-        return Program(statements, namespaces, classes, functions, 
-                      start_token.line if start_token else 1, 
-                      start_token.column if start_token else 1)
+        return Program(
+            statements=statements,
+            namespaces=namespaces,
+            classes=classes,
+            functions=functions,
+            line=(start_token.line if start_token else 1),
+            column=(start_token.column if start_token else 1)
+        )
     
     def _parse_using_statement(self) -> UsingStatement:
         """Parse a using statement"""
