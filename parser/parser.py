@@ -167,7 +167,7 @@ class Parser:
             return self._parse_throw_statement()
         elif self._check(TokenType.LBRACE):
             return self._parse_block()
-        elif self._check(TokenType.DOLLAR):
+        elif self._check(TokenType.VARIABLE):
             return self._parse_variable_declaration()
         else:
             # Expression statement
@@ -197,11 +197,11 @@ class Parser:
         """Parse a variable declaration"""
         start_token = self._peek()
         
-        # Check for modifiers
-        is_global = self._match(TokenType.GLOBAL)
-        is_local = self._match(TokenType.LOCAL)
-        is_private = self._match(TokenType.PRIVATE)
-        is_readonly = self._match(TokenType.READONLY)
+        # Check for modifiers (not supported in lexer keywords yet)
+        is_global = False
+        is_local = False
+        is_private = False
+        is_readonly = False
         
         # Check for const
         is_constant = self._match(TokenType.CONST)
@@ -212,7 +212,7 @@ class Parser:
             type_annotation = self._parse_type_annotation()
         
         # Variable name must start with $
-        name_token = self._consume(TokenType.DOLLAR, "Expected variable name starting with '$'")
+        name_token = self._consume(TokenType.VARIABLE, "Expected variable name starting with '$'")
         
         # Parse initializer if present
         initializer = None
@@ -299,7 +299,7 @@ class Parser:
         # Parse initializer (optional)
         initializer = None
         if not self._check(TokenType.SEMICOLON):
-            if self._check(TokenType.DOLLAR):
+            if self._check(TokenType.VARIABLE):
                 initializer = self._parse_variable_declaration()
             else:
                 initializer = self._parse_expression_statement()
@@ -388,7 +388,7 @@ class Parser:
             variable_type = self._parse_type_annotation()
         
         # Parse variable name
-        variable_token = self._consume(TokenType.DOLLAR, "Expected variable name in foreach")
+        variable_token = self._consume(TokenType.VARIABLE, "Expected variable name in foreach")
         
         self._consume(TokenType.IN, "Expected 'in' after foreach variable")
         
@@ -692,7 +692,7 @@ class Parser:
         # Simplified - will be expanded in later phases
         if self._check(TokenType.FUNCTION):
             return self._parse_function_declaration()
-        elif self._check(TokenType.DOLLAR):
+        elif self._check(TokenType.VARIABLE):
             return self._parse_variable_declaration()
         else:
             # For now, skip unknown members
@@ -795,9 +795,27 @@ class Parser:
             self._error(f"Unexpected token: {token.lexeme}")
             # Create a dummy expression to continue parsing
             return Literal(token=token, value=None, line=token.line, column=token.column)
-    
+            
     def _parse_infix(self, left: Expression, token: Token) -> Expression:
-        """Parse an infix expression"""
+        """Parse an infix expression including assignments and binary ops."""
+        
+        # 1. Handle Assignments (Right-Associative)
+        if can_be_assignment_operator(token.type):
+            if not isinstance(left, (Variable, MemberAccess, IndexAccess)):
+                self._error("Invalid assignment target")
+                return left
+            
+            # Use .value - 1 to ensure subsequent assignments are nested correctly
+            right = self._parse_precedence(Precedence.ASSIGNMENT.value - 1)
+            return Assignment(
+                target=left,
+                operator=token,
+                value=right,
+                line=token.line,
+                column=token.column
+            )
+        
+        # 2. Handle All Other Infix Operators
         if can_be_binary_operator(token.type):
             return self._parse_binary_operation(left, token)
         elif token.type == TokenType.LPAREN:
@@ -815,7 +833,7 @@ class Parser:
         else:
             self._error(f"Unexpected infix token: {token.lexeme}")
             return left
-    
+
     def _parse_identifier(self, token: Token) -> Expression:
         """Parse an identifier expression"""
         # Check if it's actually a type in type context
@@ -1225,7 +1243,7 @@ class Parser:
             return False
         
         token_type = self._peek().type
-        return (token_type in (TokenType.IDENTIFIER, TokenType.DOLLAR,
+        return (token_type in (TokenType.IDENTIFIER, TokenType.VARIABLE,
                                TokenType.INTEGER, TokenType.FLOAT,
                                TokenType.STRING, TokenType.BOOL, TokenType.NULL,
                                TokenType.LPAREN, TokenType.LBRACKET,
@@ -1239,9 +1257,15 @@ class Parser:
             return Precedence.NONE
         
         token_type = self._peek().type
+        # Use the precedence table for any token that has a defined precedence
+        prec = get_precedence(token_type)
+        if prec != Precedence.NONE:
+            return prec
+
+        # Fallback: if it's a known binary operator, return its precedence
         if can_be_binary_operator(token_type):
             return get_precedence(token_type)
-        
+
         return Precedence.NONE
     
     def _match(self, *token_types: TokenType) -> bool:
