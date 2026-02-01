@@ -74,7 +74,6 @@ class FloatValue(RuntimeValue):
             s += ".0"
         return s
 
-
 @dataclass
 class StringValue(RuntimeValue):
     """String value."""
@@ -84,9 +83,11 @@ class StringValue(RuntimeValue):
     def is_truthy(self) -> bool:
         return len(self.value) > 0
 
+    def __str__(self) -> str:
+        return self.value
+
     def __repr__(self) -> str:
         return repr(self.value)
-
 
 @dataclass
 class ArrayValue(RuntimeValue):
