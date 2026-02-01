@@ -31,7 +31,13 @@ class Runtime:
         return self.globals.child()
 
     def run(self, program: Any) -> Optional[RuntimeValue]:
-        """Run a parsed Program AST. Returns last expression value or None."""
-        from .interpreter import Interpreter
+        """Run a parsed Program AST. Returns last expression value or exit value."""
+        from .interpreter import Interpreter, ReturnSignal
+
         interp = Interpreter(self)
-        return interp.run(program)
+        try:
+            return interp.run(program)
+        except ReturnSignal as r:
+            # Top-level return = program exit value
+            return r.value
+
