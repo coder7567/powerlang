@@ -35,17 +35,18 @@ class SourcePosition:
 
 @dataclass
 class ScannerState:
-    """State of the scanner for save/restore"""
     position: SourcePosition
     start_pos: SourcePosition
     in_string: bool = False
     string_delimiter: Optional[str] = None
+    escaped: bool = False
     in_comment: bool = False
     in_block_comment: bool = False
     block_comment_depth: int = 0
     brace_depth: int = 0
     paren_depth: int = 0
     bracket_depth: int = 0
+
     
     def clone(self) -> 'ScannerState':
         """Create a deep copy of the scanner state"""
@@ -54,6 +55,7 @@ class ScannerState:
             start_pos=self.start_pos.clone(),
             in_string=self.in_string,
             string_delimiter=self.string_delimiter,
+            escaped=self.escaped,
             in_comment=self.in_comment,
             in_block_comment=self.in_block_comment,
             block_comment_depth=self.block_comment_depth,
@@ -61,6 +63,7 @@ class ScannerState:
             paren_depth=self.paren_depth,
             bracket_depth=self.bracket_depth
         )
+    
 
 class Scanner:
     """Character scanner for PowerLang source code"""
@@ -143,13 +146,22 @@ class Scanner:
         return False
     
     def advance(self) -> Optional[str]:
-        """Advance to next character and return the character moved past"""
         if self.is_at_end:
             return None
-        
+
         char = self.current_char
+
+        # update escape state
+        if self._state.in_string:
+            if self._state.escaped:
+                self._state.escaped = False
+            elif char == '\\':
+                self._state.escaped = True
+
+        # 🔑 ALWAYS advance position
         self._state.position.advance(char)
         return char
+
     
     def advance_if(self, condition: bool) -> Optional[str]:
         """Advance only if condition is true"""
@@ -259,6 +271,7 @@ class Scanner:
         """Exit string mode"""
         self._state.in_string = False
         self._state.string_delimiter = None
+        self._state.escaped = False
     
     def enter_comment(self) -> None:
         """Enter single-line comment mode"""
@@ -321,7 +334,10 @@ class Scanner:
         """Exit a bracket level"""
         if self._state.bracket_depth > 0:
             self._state.bracket_depth -= 1
-    
+        "New stuff here!!!"
+    def is_escaped(self) -> bool:
+        return self._state.escaped
+
     def get_brace_depth(self) -> int:
         """Get current brace nesting depth"""
         return self._state.brace_depth
