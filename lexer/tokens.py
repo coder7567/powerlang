@@ -14,7 +14,7 @@ class TokenType(Enum):
     VARIABLE = auto() 
     STRING = auto()
     INTEGER = auto()
-    DOUBLE = auto()
+    FLOAT = auto()
     BOOL = auto()
     
     # Variables
@@ -59,10 +59,14 @@ class TokenType(Enum):
     TYPEOF = auto()
     ASYNC = auto()
     AWAIT = auto()
+    ABSTRACT = auto()
+    SEALED = auto()
+    EXTENDS = auto()
+    IMPLEMENTS = auto()
     
     # Types
     INT_TYPE = auto()
-    DOUBLE_TYPE = auto()
+    FLOAT_TYPE = auto()
     STRING_TYPE = auto()
     BOOL_TYPE = auto()
     ARRAY_TYPE = auto()
@@ -162,6 +166,9 @@ class TokenType(Enum):
     
     # End of file
     EOF = auto()
+
+    # Additional operators
+    STAR_STAR = auto()
 
 @dataclass
 class Token:
