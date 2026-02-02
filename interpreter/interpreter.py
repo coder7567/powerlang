@@ -160,7 +160,8 @@ class Interpreter:
                     body=m.body,
                     closure=self.env,
                 )
-                klass.methods[method_name] = method
+                klass.methods[method_name.lower()] = method
+        
         self.env.define(name, klass, constant=False)
 
     def _execute(self, stmt: Statement) -> Optional[RuntimeValue]:
@@ -345,7 +346,8 @@ class Interpreter:
         if isinstance(expr, Literal):
             return _literal_to_value(expr)
         if isinstance(expr, Variable):
-            return self.env.get(_var_name(expr))
+            name = _var_name(expr)
+            return self.env.get(name)
         if isinstance(expr, BinaryOperation):
             return self._eval_binary(expr)
         if isinstance(expr, UnaryOperation):
@@ -557,6 +559,10 @@ class Interpreter:
         if isinstance(callee, ClassValue):
             inst = InstanceValue(klass=callee)
             init = callee.methods.get("constructor") or callee.methods.get("__init__")
+            # Debug: show available methods and lookup
+            if init is None:
+                # Try class-named constructor (e.g. function Simple(...) inside class Simple)
+                init = callee.methods.get(callee.name.lower())
             if init:
                 prev = self.env
                 self.env = init.closure.child()
@@ -572,6 +578,7 @@ class Interpreter:
                 except ReturnSignal:
                     pass
                 finally:
+                    pass
                     self.env = prev
             return inst
         raise PplRuntimeError("Can only call functions or classes")
@@ -625,6 +632,9 @@ class Interpreter:
         if isinstance(klass, ClassValue):
             inst = InstanceValue(klass=klass)
             init = klass.methods.get("constructor") or klass.methods.get("__init__")
+            # Try class-named constructor if not found
+            if init is None:
+                init = klass.methods.get(klass.name.lower())
             if init:
                 prev = self.env
                 self.env = init.closure.child()
@@ -644,6 +654,7 @@ class Interpreter:
                 except ReturnSignal:
                     pass
                 finally:
+                    pass
                     self.env = prev
             return inst
         if name.lower() == "array":
