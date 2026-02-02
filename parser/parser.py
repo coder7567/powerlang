@@ -436,33 +436,54 @@ class Parser:
                 while self._match(TokenType.COMMA):
                     values.append(self._parse_expression())
                 
-                self._consume(TokenType.COLON, "Expected ':' after case values")
-                
-                # Parse case body
+                # Accept either ':' or '{' after case values. Some source uses
+                # brace-enclosed bodies (case 1 { ... }), while others use
+                # colon followed by statements until the next case/default.
                 case_statements: List[Statement] = []
-                while (not self._check(TokenType.CASE) and 
-                       not self._check(TokenType.DEFAULT) and 
-                       not self._check(TokenType.RBRACE)):
-                    stmt = self._parse_statement()
-                    if stmt:
-                        case_statements.append(stmt)
-                
-                case_body = Block(case_statements, case_token.line, case_token.column)
-                cases.append(CaseClause(values, case_body, case_token.line, case_token.column))
+                if self._match(TokenType.COLON):
+                    while (not self._check(TokenType.CASE) and 
+                           not self._check(TokenType.DEFAULT) and 
+                           not self._check(TokenType.RBRACE)):
+                        stmt = self._parse_statement()
+                        if stmt:
+                            case_statements.append(stmt)
+                elif self._match(TokenType.LBRACE):
+                    self.brace_depth += 1
+                    while not self._check(TokenType.RBRACE) and not self._is_at_end():
+                        stmt = self._parse_statement()
+                        if stmt:
+                            case_statements.append(stmt)
+                    self._consume(TokenType.RBRACE, "Expected '}' after case body")
+                    self.brace_depth -= 1
+                else:
+                    self._consume(TokenType.COLON, "Expected ':' after case values")
+
+                case_body = Block(statements=case_statements, line=case_token.line, column=case_token.column)
+                cases.append(CaseClause(values=values, body=case_body, line=case_token.line, column=case_token.column))
                 
             elif self._match(TokenType.DEFAULT):
+                if default_case is not None:
+                    self._error("Multiple default clauses in switch statement")
                 default_token = self._previous()
-                self._consume(TokenType.COLON, "Expected ':' after 'default'")
-                
-                # Parse default body
                 default_statements: List[Statement] = []
-                while not self._check(TokenType.RBRACE) and not self._is_at_end():
-                    stmt = self._parse_statement()
-                    if stmt:
-                        default_statements.append(stmt)
-                
-                default_body = Block(default_statements, default_token.line, default_token.column)
-                default_case = DefaultClause(default_body, default_token.line, default_token.column)
+                if self._match(TokenType.COLON):
+                    while not self._check(TokenType.RBRACE) and not self._is_at_end():
+                        stmt = self._parse_statement()
+                        if stmt:
+                            default_statements.append(stmt)
+                elif self._match(TokenType.LBRACE):
+                    self.brace_depth += 1
+                    while not self._check(TokenType.RBRACE) and not self._is_at_end():
+                        stmt = self._parse_statement()
+                        if stmt:
+                            default_statements.append(stmt)
+                    self._consume(TokenType.RBRACE, "Expected '}' after default body")
+                    self.brace_depth -= 1
+                else:
+                    self._consume(TokenType.COLON, "Expected ':' after 'default'")
+
+                default_body = Block(statements=default_statements, line=default_token.line, column=default_token.column)
+                default_case = DefaultClause(body=default_body, line=default_token.line, column=default_token.column)
                 
             else:
                 self._error(f"Expected 'case' or 'default', found {self._peek().lexeme}")
