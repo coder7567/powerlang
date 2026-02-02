@@ -168,6 +168,14 @@ class Parser:
         elif self._check(TokenType.LBRACE):
             return self._parse_block()
         elif self._check(TokenType.VARIABLE):
+            # Distinguish variable declaration (e.g. `$x;` or `$x = ...`) from
+            # an expression starting with a variable (e.g. `$this.value = ...`).
+            next_token = self._peek_next()
+            if next_token and next_token.type in (
+                TokenType.DOT, TokenType.QUESTION_DOT, TokenType.DOUBLE_COLON,
+                TokenType.LPAREN, TokenType.LBRACKET
+            ):
+                return self._parse_expression_statement()
             return self._parse_variable_declaration()
         else:
             # Expression statement
@@ -780,10 +788,23 @@ class Parser:
         # Parse prefix expression
         token = self._advance()
         left = self._parse_prefix(token)
-        
+
+        # (debug prints removed)
+
         # Parse infix expressions while precedence allows
-        while (precedence.value <= self._get_current_precedence().value and 
-               not self._is_at_end()):
+        while (
+            precedence.value <= self._get_current_precedence().value and
+            not self._is_at_end() and
+            (
+                can_be_binary_operator(self._peek().type) or
+                can_be_assignment_operator(self._peek().type) or
+                self._peek().type in (
+                    TokenType.LPAREN, TokenType.LBRACKET,
+                    TokenType.DOT, TokenType.QUESTION_DOT, TokenType.DOUBLE_COLON,
+                    TokenType.PLUS_PLUS, TokenType.MINUS_MINUS, TokenType.QUESTION
+                )
+            )
+        ):
             token = self._advance()
             left = self._parse_infix(left, token)
         
@@ -826,8 +847,11 @@ class Parser:
                 self._error("Invalid assignment target")
                 return left
             
-            # Use .value - 1 to ensure subsequent assignments are nested correctly
-            right = self._parse_precedence(Precedence.ASSIGNMENT.value - 1)
+            # Use precedence value - 1 to ensure subsequent assignments are nested correctly
+            # Convert back to Precedence enum (avoid passing raw int)
+            right_prec_value = Precedence.ASSIGNMENT.value - 1
+            right_prec = Precedence(right_prec_value)
+            right = self._parse_precedence(right_prec)
             return Assignment(
                 target=left,
                 operator=token,
@@ -1288,6 +1312,19 @@ class Parser:
             return get_precedence(token_type)
 
         return Precedence.NONE
+
+    def _peek_next(self) -> Optional[Token]:
+        """Get the next token (lookahead) without consuming it"""
+        idx = self.current + 1
+        if idx >= len(self.tokens):
+            last_token = self.tokens[-1] if self.tokens else None
+            return Token(
+                TokenType.EOF, "", None,
+                last_token.line if last_token else 1,
+                last_token.column if last_token else 1,
+                last_token.position if last_token else 0
+            )
+        return self.tokens[idx]
     
     def _match(self, *token_types: TokenType) -> bool:
         """Check if current token matches any given type, consume if true"""
