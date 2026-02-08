@@ -2,6 +2,7 @@ import sys
 from powerlang.lexer.lexer import Lexer
 from powerlang.parser.parser import Parser
 from powerlang.interpreter.runtime import Runtime
+from powerlang.interpreter.values import value_to_python, NULL
 
 def main():
     if len(sys.argv) != 2:
@@ -13,8 +14,9 @@ def main():
 
     ast = Parser(Lexer(source)).parse()
     result = Runtime().run(ast)
-    if result is not None:
-        print(result)
+
+    if result is not NULL:
+        print(value_to_python(result))
 
 if __name__ == "__main__":
     main()
