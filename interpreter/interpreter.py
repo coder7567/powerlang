@@ -48,6 +48,7 @@ from ..errors import (
     IndexError as PplIndexError,
     KeyError as PplKeyError,
     RuntimeError as PplRuntimeError,
+    PowerLangError as PplError,
 )
 
 from .environment import Environment
@@ -322,7 +323,7 @@ class Interpreter:
     def _execute_try_catch(self, node: TryCatchStatement) -> Optional[RuntimeValue]:
         try:
             return self._execute_block(node.try_block)
-        except PplRuntimeError as e:
+        except PplError as e:
             for catch in node.catch_clauses:
                 prev = self.env
                 self.env = prev.child()
