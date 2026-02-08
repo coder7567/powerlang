@@ -27,6 +27,25 @@ class Environment:
     def define(self, name: str, value: RuntimeValue, *, constant: bool = False) -> None:
         """Define a variable in this scope."""
         key = _normalize_name(name)
+        # If the name already exists in an ancestor scope, update it there
+        env: Optional[Environment] = self
+        while env is not None:
+            if key in env._values:
+                # If the existing name is constant/readonly, respect it
+                if env._consts.get(key):
+                    if constant:
+                        # already defined as const; nothing to do
+                        return
+                    # trying to overwrite a constant
+                    raise PplRuntimeError(f"Cannot assign to constant '{name}'")
+                # update the existing binding in the ancestor scope
+                env._values[key] = value
+                if constant:
+                    env._consts[key] = True
+                return
+            env = env._parent
+
+        # Not found in any ancestor: define in current scope
         self._values[key] = value
         if constant:
             self._consts[key] = True
